@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "tmi",
+  "version": "1.8.9",
+  "name": "TMI",
+  "description": "TMILegacyFabric",
+  "authors": [
+    "Marglyph,Wotblitz,HowardZHY"
+  ],
+  "contact": {
+    "sources": "https://github.com/HowardZHY"
+  },
+  "license": "CUSTOM",
+  "icon": "assets/TMIFabric/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "main": [
+      "net.minecraft.src.TMIFabricContainer"
+    ]
+  },
+
+  "mixins": [
+      "TMI.mixins.json"
+  ],
+  "accessWidener": "TMI.accesswidener",
+  "depends": {
+  },
+  "custom": {
+    "modmenu:clientsideOnly": true
+  }
+}

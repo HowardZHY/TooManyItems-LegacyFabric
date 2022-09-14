@@ -1,0 +1,5 @@
+accessWidener	v1	intermediary
+accessible	field	net/minecraft/class_1127	field_9167	[Lnet/minecraft/class_1127;
+accessible	method	net/minecraft/class_1641	method_5869	(I)V
+accessible	method	net/minecraft/class_474	method_1649	(Ljava/io/DataInput;ILnet/minecraft/class_1944;)V
+accessible	method	net/minecraft/class_474	method_1650	(Ljava/io/DataOutput;)V
