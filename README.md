@@ -1,7 +1,7 @@
 # TooManyItems-LegayFabric
 
 TooManyItems mod For Legacy Fabric 1.8.2-1.8.9
-
+![image](https://github.com/HowardZHY/TooManyItems-LegayFabric/blob/1.8.9/TMILF.png)
 see https://github.com/HowardZHY/TooManyItems for 1.8.8/9 Forge one and more info
 
 ## Install:
