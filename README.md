@@ -11,7 +11,7 @@ see https://github.com/HowardZHY/TooManyItems for 1.8.8/9 Forge one and more inf
 4. Put TMILegacyFabricLoader.jar in mods folder
 5. Launch and Enjoy
 
-Known Bugs: Search bar cause game freezing.
+Known Bugs: Search bar cause game freezing. Save panel might have EOF exceptions.
 
 ## COPYRIGHT INFO:
 "Copyright 2011-2014 Marglyph. Free for personal or educational use only. Do not redistribute TooManyItems, including in mod packs, and do not use TooManyItems' source code or graphics in your own mods."
