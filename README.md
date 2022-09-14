@@ -1,7 +1,6 @@
 # TooManyItems-LegayFabric
-TMI Legacy Fabric port
 
-TMI For Legacy Fabric 1.8.2-1.8.9
+TooManyItems mod For Legacy Fabric 1.8.2-1.8.9
 
 ## Install:
 1. Install Fabric Loader
