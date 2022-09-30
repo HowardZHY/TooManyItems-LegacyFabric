@@ -12,6 +12,7 @@ see https://github.com/HowardZHY/TooManyItems for more info
 5. Launch and Enjoy
 
 Known Bugs: Controll icons showed incorrectlly.
+![image](https://github.com/HowardZHY/TooManyItems-LegacyFabric/blob/1.3.2/TMI1.3.2.png)
 
 ## COPYRIGHT INFO:
 Original Post: https://www.minecraftforum.net/forums/mapping-and-modding-java-edition/minecraft-mods/1272385-toomanyitems-the-inventory-editor-and-more-1-8
