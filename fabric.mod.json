@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "id": "tmi",
-  "version": "1.8.9",
+  "version": "1.3.2",
   "name": "TMI",
   "description": "TMILegacyFabric",
   "authors": [
-    "Marglyph,Wotblitz,HowardZHY"
+    "Marglyph,HowardZHY"
   ],
   "contact": {
     "sources": "https://github.com/HowardZHY"
