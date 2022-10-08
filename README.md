@@ -1,18 +1,18 @@
 # TooManyItems-LegayFabric
 
-TooManyItems mod For Legacy Fabric 1.3.2
+TooManyItems mod For Legacy Fabric 1.4.7
 
 see https://github.com/HowardZHY/TooManyItems for more info
 
 ## Install:
 1. Install Fabric Loader
 2. Launch Legacy Fabric, there'll be a .fabric folder, then exit the game
-3. Drag the files in the zip into .fabric\remappedJars\minecraft-1.3.2-0.14.9(or other version)\client-intermediary.jar
+3. Drag the files in the zip into .fabric\remappedJars\minecraft-1.4.7-0.14.9(or other version)\client-intermediary.jar
 4. Put TMILegacyFabricLoader.jar in mods folder
 5. Launch and Enjoy
 
 Known Bugs: Controll icons showed incorrectlly.
-![image](https://github.com/HowardZHY/TooManyItems-LegacyFabric/blob/1.3.2/TMI1.3.2.png)
+![image](https://github.com/HowardZHY/TooManyItems-LegacyFabric/blob/1.4.7/TMI1.4.7.png)
 
 ## COPYRIGHT INFO:
 Original Post: https://www.minecraftforum.net/forums/mapping-and-modding-java-edition/minecraft-mods/1272385-toomanyitems-the-inventory-editor-and-more-1-8
