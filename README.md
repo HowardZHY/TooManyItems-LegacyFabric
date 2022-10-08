@@ -1,6 +1,6 @@
 # TooManyItems-LegayFabric
 
-TooManyItems mod For Legacy Fabric 1.4.7
+TooManyItems mod For Legacy Fabric 1.4.6-1.4.7
 
 see https://github.com/HowardZHY/TooManyItems for more info
 
