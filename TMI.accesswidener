@@ -1,10 +1,8 @@
-accessWidener v1 named
-
-accessible field net/minecraft/class_1150 field_4522 Lnet/minecraft/class_100;
-
-accessible field net/minecraft/class_388 field_1234 Lnet/minecraft/class_370;
-
-accessible method net/minecraft/class_372 method_989 (IIIIII)V;
-
-accessible method net/minecraft/class_409 method_1131 (Lnet/minecraft/class_1026;IIZ)V;
-
+accessWidener	v1	intermediary
+accessible	class	net/minecraft/class_417
+accessible	field	net/minecraft/class_1150	field_4522	Lnet/minecraft/class_100;
+accessible	field	net/minecraft/class_388	field_1234	Lnet/minecraft/class_370;
+accessible	method	net/minecraft/class_372	method_989	(IIIIII)V
+accessible	method	net/minecraft/class_409	method_1131	(Lnet/minecraft/class_1026;IIZ)V
+accessible	method	net/minecraft/class_474	method_1649	(Ljava/io/DataInput;)V
+accessible	method	net/minecraft/class_474	method_1650	(Ljava/io/DataOutput;)V
