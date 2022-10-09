@@ -1,6 +1,6 @@
 # TooManyItems-LegayFabric
 
-Here's the old Too Many Items mod on Legacy Fabric. There are TMI for LF 1.3.2, 1.4.7, 1.8.2-1.8.9 and 15w14a, and an intermediary 1.10.2 client based on wotblitz@minecraftforum(@RedCDev)'s base edit client.
+Here's the old Too Many Items mod on Legacy Fabric. There are TMI for LF 1.3.2, 1.4.6-1.4.7, 1.5.X, 1.8.2-1.8.9 and 15w14a, and an intermediary 1.10.2 client based on wotblitz@minecraftforum(@RedCDev)'s base edit client.
 
 ![image](https://github.com/HowardZHY/TooManyItems-LegayFabric/blob/1.8.9/TMILF.png)
 
