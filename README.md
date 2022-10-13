@@ -11,7 +11,7 @@ see https://github.com/HowardZHY/TooManyItems for more info
 4. Put TMILegacyFabricLoader.jar in mods folder
 5. Launch and Enjoy
 
-Known Bugs: Controll icons showed incorrectlly.
+Known Bugs: none
 ![image](https://github.com/HowardZHY/TooManyItems-LegacyFabric/blob/1.3.2/TMI1.3.2.png)
 
 ## COPYRIGHT INFO:
