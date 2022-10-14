@@ -14,7 +14,7 @@ see https://github.com/HowardZHY/TooManyItems for 1.8.8/9 Forge one and more inf
 4. Put TMILegacyFabricLoader.jar in mods folder
 5. Launch and Enjoy
 
-Known Bugs: Search bar cause game freezing. Save panel might have EOF exceptions.
+Known Bugs: was Fixed.
 
 ## COPYRIGHT INFO:
 Original Post: https://www.minecraftforum.net/forums/mapping-and-modding-java-edition/minecraft-mods/1272385-toomanyitems-the-inventory-editor-and-more-1-8
