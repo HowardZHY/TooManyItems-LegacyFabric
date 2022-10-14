@@ -1,16 +1,15 @@
 # TooManyItems-LegayFabric
 
-Here's the old Too Many Items mod on Legacy Fabric. There are TMI for LF 1.3.2, 1.4.6-1.4.7, 1.5.X, 1.6.X, 1.8.2-1.8.9 and 15w14a, and an intermediary 1.10.2 client based on wotblitz@minecraftforum(@RedCDev)'s base edit client.
+TooManyItems mod For Legacy Fabric 1.8.0-1.8.1
 
-![image](https://github.com/HowardZHY/TooManyItems-LegayFabric/blob/1.8.9/TMILF.png)
+![image](https://github.com/HowardZHY/TooManyItems-LegayFabric/blob/1.8.0/TMI1.8.1.png)
 
-![image](https://github.com/HowardZHY/TooManyItems-LegayFabric/blob/1.8.9/TMI15w14a.png)
 see https://github.com/HowardZHY/TooManyItems for 1.8.8/9 Forge one and more info
 
 ## Install:
 1. Install Fabric Loader
 2. Launch Legacy Fabric, there'll be a .fabric folder, then exit the game
-3. Drag the files in the zip into .fabric\remappedJars\minecraft-1.8.9-0.14.9(or other version)\client-intermediary.jar
+3. Drag the files in the zip into .fabric\remappedJars\minecraft-1.8-0.14.9(or other version)\client-intermediary.jar
 4. Put TMILegacyFabricLoader.jar in mods folder
 5. Launch and Enjoy
 
