@@ -1,6 +1,6 @@
 # TooManyItems-LegayFabric
 
-Here's the old Too Many Items mod on Legacy Fabric. There are TMI for LF 1.3.2, 1.4.6-1.4.7, 1.5.X, 1.6.X, 1.8.2-1.8.9 and 15w14a, and an intermediary 1.10.2 client based on wotblitz@minecraftforum(@RedCDev)'s base edit client.
+Here's the Unoffical version of old Too Many Items mod to make it working on Legacy Fabric. There are TMI for LF 1.3.2, 1.4.6-1.4.7, 1.5.X, 1.6.X, 1.8.2-1.8.9 and 15w14a, and an intermediary 1.10.2 client based on wotblitz@minecraftforum(@RedCDev)'s base edit client.
 
 ![image](https://github.com/HowardZHY/TooManyItems-LegayFabric/blob/1.8.9/TMILF.png)
 
@@ -17,8 +17,10 @@ see https://github.com/HowardZHY/TooManyItems for 1.8.8/9 Forge one and more inf
 Known Bugs: was Fixed.
 
 ## COPYRIGHT INFO:
+HowardZHY made this creation BUT it belongs to Marglyph:
+
 Original Post: https://www.minecraftforum.net/forums/mapping-and-modding-java-edition/minecraft-mods/1272385-toomanyitems-the-inventory-editor-and-more-1-8
 
 "Copyright 2011-2014 Marglyph. Free for personal or educational use only. Do not redistribute TooManyItems, including in mod packs, and do not use TooManyItems' source code or graphics in your own mods."
 
-The sources here is for personal or educational use only, as the Copyright is still belongs to Marglyph without further disagreement.
+The resources here is for personal or educational use only, as the Copyright is still belongs to Marglyph without further disagreement.
