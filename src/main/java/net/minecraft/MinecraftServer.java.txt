@@ -1,0 +1,1055 @@
+package net.minecraft.server;
+
+import com.google.common.base.Charsets;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Queues;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
+import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.GameProfileRepository;
+import com.mojang.authlib.minecraft.MinecraftSessionService;
+import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.base64.Base64;
+import java.awt.GraphicsEnvironment;
+import java.awt.image.BufferedImage;
+import java.awt.image.RenderedImage;
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.Proxy;
+import java.security.KeyPair;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Queue;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import javax.imageio.ImageIO;
+import net.minecraft.class_2934;
+import net.minecraft.command.AbstractCommand;
+import net.minecraft.command.CommandSource;
+import net.minecraft.command.CommandStats;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.ServerPlayerEntity;
+import net.minecraft.network.Packet;
+import net.minecraft.network.packet.s2c.play.WorldTimeUpdateS2CPacket;
+import net.minecraft.server.PlayerManager;
+import net.minecraft.server.ServerMetadata;
+import net.minecraft.server.ServerNetworkIo;
+import net.minecraft.server.command.CommandManager;
+import net.minecraft.server.command.CommandRegistryProvider;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.world.ServerWorldManager;
+import net.minecraft.text.LiteralText;
+import net.minecraft.text.Text;
+import net.minecraft.util.ProgressListener;
+import net.minecraft.util.ThreadExecutor;
+import net.minecraft.util.Tickable;
+import net.minecraft.util.UserCache;
+import net.minecraft.util.Util;
+import net.minecraft.util.crash.CrashCallable;
+import net.minecraft.util.crash.CrashException;
+import net.minecraft.util.crash.CrashReport;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.profiler.Profiler;
+import net.minecraft.util.snooper.Snoopable;
+import net.minecraft.util.snooper.Snooper;
+import net.minecraft.world.DemoServerWorld;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.GameMode;
+import net.minecraft.world.MultiServerWorld;
+import net.minecraft.world.SaveHandler;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldEventListener;
+import net.minecraft.world.level.LevelGeneratorType;
+import net.minecraft.world.level.LevelInfo;
+import net.minecraft.world.level.LevelProperties;
+import net.minecraft.world.level.storage.AnvilLevelStorage;
+import net.minecraft.world.level.storage.LevelStorageAccess;
+import net.minecraft.world.level.storage.WorldSaveException;
+import org.apache.commons.lang3.Validate;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+public abstract class MinecraftServer
+implements Runnable,
+CommandSource,
+ThreadExecutor,
+Snoopable {
+    private static final Logger LOGGER = LogManager.getLogger();
+    public static final File USER_CACHE_FILE = new File("usercache.json");
+    private static MinecraftServer mcServer;
+    private final LevelStorageAccess saveStorage;
+    private final Snooper field_13903 = new Snooper("server", (Snoopable)this, MinecraftServer.getTimeMillis());
+    private final File gameDir;
+    private final List<Tickable> tickables = Lists.newArrayList();
+    public final CommandRegistryProvider provider;
+    public final Profiler profiler = new Profiler();
+    private final ServerNetworkIo networkIo;
+    private final ServerMetadata serverMetadata = new ServerMetadata();
+    private final Random random = new Random();
+    private final class_2934 field_13904;
+    private int serverPort = -1;
+    public ServerWorld[] worlds;
+    private PlayerManager playerManager;
+    private boolean running = true;
+    private boolean stopped;
+    private int ticks;
+    protected final Proxy proxy;
+    public String progressType;
+    public int progress;
+    private boolean onlineMode;
+    private boolean spawnAnimals;
+    private boolean spawnNpcs;
+    private boolean pvpEnabled;
+    private boolean flightEnabled;
+    private String motd;
+    private int worldHeight;
+    private int playerIdleTimeout;
+    public final long[] lastTickLengths = new long[100];
+    public long[][] field_3858;
+    private KeyPair keyPair;
+    private String userName;
+    private String levelName;
+    private String displayName;
+    private boolean demo;
+    private boolean forceWorldUpgrade;
+    private String resourcePackUrl = "";
+    private String resourcePackHash = "";
+    private boolean loading;
+    private long lastWarnTime;
+    private String serverOperation;
+    private boolean profiling;
+    private boolean forceGameMode;
+    private final YggdrasilAuthenticationService authService;
+    private final MinecraftSessionService sessionService;
+    private final GameProfileRepository gameProfileRepo;
+    private final UserCache userCache;
+    private long lastPlayerSampleUpdate;
+    public final Queue<FutureTask<?>> queue = Queues.newArrayDeque();
+    private Thread serverThread;
+    private long timeReference = MinecraftServer.getTimeMillis();
+    private boolean field_13902;
+
+    public MinecraftServer(File anvilFileIn, Proxy proxyIn, class_2934 dataFixerIn, YggdrasilAuthenticationService authServiceIn, MinecraftSessionService sessionServiceIn, GameProfileRepository profileRepoIn, UserCache profileCacheIn) {
+        mcServer = this;
+        this.proxy = proxyIn;
+        this.authService = authServiceIn;
+        this.sessionService = sessionServiceIn;
+        this.gameProfileRepo = profileRepoIn;
+        this.userCache = profileCacheIn;
+        this.gameDir = anvilFileIn;
+        this.networkIo = new ServerNetworkIo(this);
+        this.provider = this.createCommandManager();
+        this.saveStorage = new AnvilLevelStorage(anvilFileIn, dataFixerIn);
+        this.field_13904 = dataFixerIn;
+    }
+
+    public CommandManager createCommandManager() {
+        return new CommandManager(this);
+    }
+
+    public abstract boolean setupServer() throws IOException;
+
+    public void upgradeWorld(String name) {
+        if (this.getSaveStorage().needsConversion(name)) {
+            LOGGER.info("Converting map!");
+            this.setServerOperation("menu.convertingLevel");
+            this.getSaveStorage().convert(name, new ProgressListener(){
+                private long lastProgressUpdate = System.currentTimeMillis();
+
+                public void method_2365(String message) {
+                }
+
+                public void method_2366(String message) {
+                }
+
+                public void method_2364(int progress) {
+                    if (System.currentTimeMillis() - this.lastProgressUpdate >= 1000L) {
+                        this.lastProgressUpdate = System.currentTimeMillis();
+                        LOGGER.info("Converting... {}%", new Object[]{progress});
+                    }
+                }
+
+                public void method_8348() {
+                }
+
+                public void method_2367(String message) {
+                }
+            });
+        }
+    }
+
+    protected synchronized void setServerOperation(String operation) {
+        this.serverOperation = operation;
+    }
+
+    public synchronized String getServerOperation() {
+        return this.serverOperation;
+    }
+
+    public void setupWorld(String world, String worldName, long seed, LevelGeneratorType generatorType, String generatorOptions) {
+        LevelInfo worldsettings;
+        this.upgradeWorld(world);
+        this.setServerOperation("menu.loadingLevel");
+        this.worlds = new ServerWorld[3];
+        this.field_3858 = new long[this.worlds.length][100];
+        SaveHandler isavehandler = this.saveStorage.createSaveHandler(world, true);
+        this.loadResourcePack(this.getLevelName(), isavehandler);
+        LevelProperties worldinfo = isavehandler.getLevelProperties();
+        if (worldinfo == null) {
+            if (this.isDemo()) {
+                worldsettings = DemoServerWorld.INFO;
+            } else {
+                worldsettings = new LevelInfo(seed, this.method_3026(), this.shouldGenerateStructures(), this.isHardcore(), generatorType);
+                worldsettings.setGeneratorOptions(generatorOptions);
+                if (this.forceWorldUpgrade) {
+                    worldsettings.setBonusChest();
+                }
+            }
+            worldinfo = new LevelProperties(worldsettings, worldName);
+        } else {
+            worldinfo.setLevelName(worldName);
+            worldsettings = new LevelInfo(worldinfo);
+        }
+        for (int i = 0; i < this.worlds.length; ++i) {
+            int j = 0;
+            if (i == 1) {
+                j = -1;
+            }
+            if (i == 2) {
+                j = 1;
+            }
+            if (i == 0) {
+                this.worlds[i] = this.isDemo() ? (ServerWorld)new DemoServerWorld(this, isavehandler, worldinfo, j, this.profiler).method_8525() : (ServerWorld)new ServerWorld(this, isavehandler, worldinfo, j, this.profiler).method_8525();
+                this.worlds[i].method_3641(worldsettings);
+            } else {
+                this.worlds[i] = (ServerWorld)new MultiServerWorld(this, isavehandler, j, this.worlds[0], this.profiler).method_8525();
+            }
+            this.worlds[i].method_3640((WorldEventListener)new ServerWorldManager(this, this.worlds[i]));
+            if (this.isSinglePlayer()) continue;
+            this.worlds[i].method_3588().method_207(this.method_3026());
+        }
+        this.playerManager.setMainWorld(this.worlds);
+        this.setDifficulty(this.getDefaultDifficulty());
+        this.prepareWorlds();
+    }
+
+    public void prepareWorlds() {
+        int i = 16;
+        int j = 4;
+        int k = 192;
+        int l = 625;
+        int i1 = 0;
+        this.setServerOperation("menu.generatingTerrain");
+        boolean j1 = false;
+        LOGGER.info("Preparing start region for level 0");
+        ServerWorld worldserver = this.worlds[0];
+        BlockPos blockpos = worldserver.method_3585();
+        long k1 = MinecraftServer.getTimeMillis();
+        for (int l1 = -192; l1 <= 192 && this.isRunning(); l1 += 16) {
+            for (int i2 = -192; i2 <= 192 && this.isRunning(); i2 += 16) {
+                long j2 = MinecraftServer.getTimeMillis();
+                if (j2 - k1 > 1000L) {
+                    this.logProgress("Preparing spawn area", i1 * 100 / 625);
+                    k1 = j2;
+                }
+                ++i1;
+                worldserver.getChunkProvider().method_11766(blockpos.method_10572() + l1 >> 4, blockpos.method_10574() + i2 >> 4);
+            }
+        }
+        this.save();
+    }
+
+    public void loadResourcePack(String levelName, SaveHandler saveHandler) {
+        File file1 = new File(saveHandler.getWorldFolder(), "resources.zip");
+        if (file1.isFile()) {
+            this.setResourcePack("level://" + levelName + "/resources.zip", "");
+        }
+    }
+
+    public abstract boolean shouldGenerateStructures();
+
+    public abstract GameMode method_3026();
+
+    public abstract Difficulty getDefaultDifficulty();
+
+    public abstract boolean isHardcore();
+
+    public abstract int getOpPermissionLevel();
+
+    public abstract boolean shouldBroadcastRconToOps();
+
+    public abstract boolean shouldBroadcastConsoleToIps();
+
+    protected void logProgress(String progressType, int worldProgress) {
+        this.progressType = progressType;
+        this.progress = worldProgress;
+        LOGGER.info("{}: {}%", new Object[]{progressType, worldProgress});
+    }
+
+    protected void save() {
+        this.progressType = null;
+        this.progress = 0;
+    }
+
+    public void saveWorlds(boolean silent) {
+        for (ServerWorld worldserver : this.worlds) {
+            if (worldserver == null) continue;
+            if (!silent) {
+                LOGGER.info("Saving chunks for level '{}'/{}", new Object[]{worldserver.method_3588().getLevelName(), worldserver.field_4558.getDimensionType().getName()});
+            }
+            try {
+                worldserver.save(true, (ProgressListener)null);
+            }
+            catch (WorldSaveException minecraftexception) {
+                LOGGER.warn(minecraftexception.getMessage());
+            }
+        }
+    }
+
+    public void stopServer() {
+        LOGGER.info("Stopping server");
+        if (this.getNetworkIo() != null) {
+            this.getNetworkIo().stop();
+        }
+        if (this.playerManager != null) {
+            LOGGER.info("Saving players");
+            this.playerManager.saveAllPlayerData();
+            this.playerManager.disconnectAllPlayers();
+        }
+        if (this.worlds != null) {
+            LOGGER.info("Saving worlds");
+            for (ServerWorld worldserver : this.worlds) {
+                if (worldserver == null) continue;
+                worldserver.savingDisabled = false;
+            }
+            this.saveWorlds(false);
+            for (ServerWorld worldserver1 : this.worlds) {
+                if (worldserver1 == null) continue;
+                worldserver1.close();
+            }
+        }
+        if (this.field_13903.isActive()) {
+            this.field_13903.concel();
+        }
+    }
+
+    public boolean isRunning() {
+        return this.running;
+    }
+
+    public void stopRunning() {
+        this.running = false;
+    }
+
+    /*
+     * WARNING - Removed try catching itself - possible behaviour change.
+     */
+    public void run() {
+        try {
+            if (this.setupServer()) {
+                this.timeReference = MinecraftServer.getTimeMillis();
+                long i = 0L;
+                this.serverMetadata.setDescription((Text)new LiteralText(this.motd));
+                this.serverMetadata.setVersion(new ServerMetadata.Version("1.10.2", 210));
+                this.setServerMeta(this.serverMetadata);
+                while (this.running) {
+                    long k = MinecraftServer.getTimeMillis();
+                    long j = k - this.timeReference;
+                    if (j > 2000L && this.timeReference - this.lastWarnTime >= 15000L) {
+                        LOGGER.warn("Can't keep up! Did the system time change, or is the server overloaded? Running {}ms behind, skipping {} tick(s)", new Object[]{j, j / 50L});
+                        j = 2000L;
+                        this.lastWarnTime = this.timeReference;
+                    }
+                    if (j < 0L) {
+                        LOGGER.warn("Time ran backwards! Did the system time change?");
+                        j = 0L;
+                    }
+                    i += j;
+                    this.timeReference = k;
+                    if (this.worlds[0].isReady()) {
+                        this.setupWorld();
+                        i = 0L;
+                    } else {
+                        while (i > 50L) {
+                            i -= 50L;
+                            this.setupWorld();
+                        }
+                    }
+                    Thread.sleep((long)Math.max((long)1L, (long)(50L - i)));
+                    this.loading = true;
+                }
+            } else {
+                this.setCrashReport(null);
+            }
+        }
+        catch (Throwable throwable1) {
+            LOGGER.error("Encountered an unexpected exception", throwable1);
+            CrashReport crashreport = null;
+            crashreport = throwable1 instanceof CrashException ? this.populateCrashReport(((CrashException)throwable1).getReport()) : this.populateCrashReport(new CrashReport("Exception in server tick loop", throwable1));
+            File file1 = new File(new File(this.getRunDirectory(), "crash-reports"), "crash-" + new SimpleDateFormat("yyyy-MM-dd_HH.mm.ss").format(new Date()) + "-server.txt");
+            if (crashreport.writeToFile(file1)) {
+                LOGGER.error("This crash report has been saved to: {}", new Object[]{file1.getAbsolutePath()});
+            } else {
+                LOGGER.error("We were unable to save this crash report to disk.");
+            }
+            this.setCrashReport(crashreport);
+        }
+        finally {
+            try {
+                this.stopped = true;
+                this.stopServer();
+            }
+            catch (Throwable throwable) {
+                LOGGER.error("Exception stopping the server", throwable);
+            }
+            finally {
+                this.exit();
+            }
+        }
+    }
+
+    /*
+     * WARNING - Removed try catching itself - possible behaviour change.
+     */
+    public void setServerMeta(ServerMetadata metdata) {
+        File file1 = this.getFile("server-icon.png");
+        if (!file1.exists()) {
+            file1 = this.getSaveStorage().method_11957(this.getLevelName(), "icon.png");
+        }
+        if (file1.isFile()) {
+            ByteBuf bytebuf = Unpooled.buffer();
+            try {
+                BufferedImage bufferedimage = ImageIO.read((File)file1);
+                Validate.validState((bufferedimage.getWidth() == 64 ? 1 : 0) != 0, (String)"Must be 64 pixels wide", (Object[])new Object[0]);
+                Validate.validState((bufferedimage.getHeight() == 64 ? 1 : 0) != 0, (String)"Must be 64 pixels high", (Object[])new Object[0]);
+                ImageIO.write((RenderedImage)bufferedimage, (String)"PNG", (OutputStream)new ByteBufOutputStream(bytebuf));
+                ByteBuf bytebuf1 = Base64.encode((ByteBuf)bytebuf);
+                metdata.setFavicon("data:image/png;base64," + bytebuf1.toString(Charsets.UTF_8));
+            }
+            catch (Exception exception) {
+                LOGGER.error("Couldn't load server icon", (Throwable)exception);
+            }
+            finally {
+                bytebuf.release();
+            }
+        }
+    }
+
+    public boolean method_12837() {
+        this.field_13902 = this.field_13902 || this.method_12838().isFile();
+        return this.field_13902;
+    }
+
+    public File method_12838() {
+        return this.getSaveStorage().method_11957(this.getLevelName(), "icon.png");
+    }
+
+    public File getRunDirectory() {
+        return new File(".");
+    }
+
+    public void setCrashReport(CrashReport report) {
+    }
+
+    public void exit() {
+    }
+
+    public void setupWorld() {
+        long i = System.nanoTime();
+        ++this.ticks;
+        if (this.profiling) {
+            this.profiling = false;
+            this.profiler.enabled = true;
+            this.profiler.reset();
+        }
+        this.profiler.push("root");
+        this.tick();
+        if (i - this.lastPlayerSampleUpdate >= 5000000000L) {
+            this.lastPlayerSampleUpdate = i;
+            this.serverMetadata.setPlayers(new ServerMetadata.Players(this.getMaxPlayerCount(), this.getCurrentPlayerCount()));
+            Object[] agameprofile = new GameProfile[Math.min((int)this.getCurrentPlayerCount(), (int)12)];
+            int j = MathHelper.nextInt((Random)this.random, (int)0, (int)(this.getCurrentPlayerCount() - agameprofile.length));
+            for (int k = 0; k < agameprofile.length; ++k) {
+                agameprofile[k] = ((ServerPlayerEntity)this.playerManager.getPlayers().get(j + k)).method_8429();
+            }
+            Collections.shuffle((List)Arrays.asList((Object[])agameprofile));
+            this.serverMetadata.getPlayers().setSample((GameProfile[])agameprofile);
+        }
+        if (this.ticks % 900 == 0) {
+            this.profiler.push("save");
+            this.playerManager.saveAllPlayerData();
+            this.saveWorlds(true);
+            this.profiler.pop();
+        }
+        this.profiler.push("tallying");
+        this.lastTickLengths[this.ticks % 100] = System.nanoTime() - i;
+        this.profiler.pop();
+        this.profiler.push("snooper");
+        if (!this.field_13903.isActive() && this.ticks > 100) {
+            this.field_13903.setActive();
+        }
+        if (this.ticks % 6000 == 0) {
+            this.field_13903.addCpuInfo();
+        }
+        this.profiler.pop();
+        this.profiler.pop();
+    }
+
+    /*
+     * WARNING - Removed try catching itself - possible behaviour change.
+     */
+    public void tick() {
+        this.profiler.push("jobs");
+        Queue<FutureTask<?>> queue = this.queue;
+        synchronized (queue) {
+            while (!this.queue.isEmpty()) {
+                Util.executeTask((FutureTask)((FutureTask)this.queue.poll()), (Logger)LOGGER);
+            }
+        }
+        this.profiler.swap("levels");
+        for (int j = 0; j < this.worlds.length; ++j) {
+            long i = System.nanoTime();
+            if (j == 0 || this.isNetherAllowed()) {
+                ServerWorld worldserver = this.worlds[j];
+                this.profiler.push(worldserver.method_3588().getLevelName());
+                if (this.ticks % 20 == 0) {
+                    this.profiler.push("timeSync");
+                    this.playerManager.sendToDimension((Packet)new WorldTimeUpdateS2CPacket(worldserver.method_4678(), worldserver.method_3583(), worldserver.method_4679().getBoolean("doDaylightCycle")), worldserver.field_4558.getDimensionType().getId());
+                    this.profiler.pop();
+                }
+                this.profiler.push("tick");
+                try {
+                    worldserver.method_3646();
+                }
+                catch (Throwable throwable1) {
+                    CrashReport crashreport = CrashReport.create((Throwable)throwable1, (String)"Exception ticking world");
+                    worldserver.method_4684(crashreport);
+                    throw new CrashException(crashreport);
+                }
+                try {
+                    worldserver.method_3706();
+                }
+                catch (Throwable throwable) {
+                    CrashReport crashreport1 = CrashReport.create((Throwable)throwable, (String)"Exception ticking world entities");
+                    worldserver.method_4684(crashreport1);
+                    throw new CrashException(crashreport1);
+                }
+                this.profiler.pop();
+                this.profiler.push("tracker");
+                worldserver.getEntityTracker().method_2095();
+                this.profiler.pop();
+                this.profiler.pop();
+            }
+            this.field_3858[j][this.ticks % 100] = System.nanoTime() - i;
+        }
+        this.profiler.swap("connection");
+        this.getNetworkIo().tick();
+        this.profiler.swap("players");
+        this.playerManager.updatePlayerLatency();
+        this.profiler.swap("tickables");
+        for (int k = 0; k < this.tickables.size(); ++k) {
+            ((Tickable)this.tickables.get(k)).tick();
+        }
+        this.profiler.pop();
+    }
+
+    public boolean isNetherAllowed() {
+        return true;
+    }
+
+    public void startServerThread() {
+        this.serverThread = new Thread((Runnable)this, "Server thread");
+        this.serverThread.start();
+    }
+
+    public File getFile(String name) {
+        return new File(this.getRunDirectory(), name);
+    }
+
+    public void warn(String message) {
+        LOGGER.warn(message);
+    }
+
+    public ServerWorld getWorld(int id) {
+        return id == -1 ? this.worlds[1] : (id == 1 ? this.worlds[2] : this.worlds[0]);
+    }
+
+    public String getVersion() {
+        return "1.10.2";
+    }
+
+    public int getCurrentPlayerCount() {
+        return this.playerManager.getCurrentPlayerCount();
+    }
+
+    public int getMaxPlayerCount() {
+        return this.playerManager.getMaxPlayerCount();
+    }
+
+    public String[] getPlayerNames() {
+        return this.playerManager.getPlayerNames();
+    }
+
+    public GameProfile[] getProfiles() {
+        return this.playerManager.getProfiles();
+    }
+
+    public String getServerModName() {
+        return "vanilla";
+    }
+
+    public CrashReport populateCrashReport(CrashReport report) {
+        report.getSystemDetailsSection().add("Profiler Position", (CrashCallable)new CrashCallable<String>(){
+
+            public String call() throws Exception {
+                return MinecraftServer.this.profiler.enabled ? MinecraftServer.this.profiler.getCurrentLocation() : "N/A (disabled)";
+            }
+        });
+        if (this.playerManager != null) {
+            report.getSystemDetailsSection().add("Player Count", (CrashCallable)new CrashCallable<String>(){
+
+                public String call() {
+                    return MinecraftServer.this.playerManager.getCurrentPlayerCount() + " / " + MinecraftServer.this.playerManager.getMaxPlayerCount() + "; " + MinecraftServer.this.playerManager.getPlayers();
+                }
+            });
+        }
+        return report;
+    }
+
+    public List<String> method_12835(CommandSource sender, String input, BlockPos pos, boolean hasTargetBlock) {
+        ArrayList list = Lists.newArrayList();
+        boolean flag = input.startsWith("/");
+        if (flag) {
+            input = input.substring(1);
+        }
+        if (!flag && !hasTargetBlock) {
+            String[] astring = input.split(" ", -1);
+            String s2 = astring[astring.length - 1];
+            for (String s1 : this.playerManager.getPlayerNames()) {
+                if (!AbstractCommand.method_2883((String)s2, (String)s1)) continue;
+                list.add((Object)s1);
+            }
+            return list;
+        }
+        boolean flag1 = !input.contains((CharSequence)" ");
+        List list1 = this.provider.getCompletions(sender, input, pos);
+        if (!list1.isEmpty()) {
+            for (String s : list1) {
+                if (flag1) {
+                    list.add((Object)("/" + s));
+                    continue;
+                }
+                list.add((Object)s);
+            }
+        }
+        return list;
+    }
+
+    public boolean hasGameDir() {
+        return this.gameDir != null;
+    }
+
+    public String method_2518() {
+        return "Server";
+    }
+
+    public void method_5505(Text component) {
+        LOGGER.info(component.getString());
+    }
+
+    public boolean method_3333(int permLevel, String commandName) {
+        return true;
+    }
+
+    public CommandRegistryProvider getCommandManager() {
+        return this.provider;
+    }
+
+    public KeyPair getKeyPair() {
+        return this.keyPair;
+    }
+
+    public String getUserName() {
+        return this.userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    public boolean isSinglePlayer() {
+        return this.userName != null;
+    }
+
+    public String getLevelName() {
+        return this.levelName;
+    }
+
+    public void setLevelName(String levelName) {
+        this.levelName = levelName;
+    }
+
+    public void setServerName(String serverName) {
+        this.displayName = serverName;
+    }
+
+    public String getServerName() {
+        return this.displayName;
+    }
+
+    public void setKeyPair(KeyPair keyPair) {
+        this.keyPair = keyPair;
+    }
+
+    public void setDifficulty(Difficulty difficulty) {
+        for (ServerWorld worldserver : this.worlds) {
+            if (worldserver == null) continue;
+            if (worldserver.method_3588().isHardcore()) {
+                worldserver.method_3588().setDifficulty(Difficulty.HARD);
+                worldserver.method_3645(true, true);
+                continue;
+            }
+            if (this.isSinglePlayer()) {
+                worldserver.method_3588().setDifficulty(difficulty);
+                worldserver.method_3645(worldserver.method_8519() != Difficulty.PEACEFUL, true);
+                continue;
+            }
+            worldserver.method_3588().setDifficulty(difficulty);
+            worldserver.method_3645(this.isMonsterSpawningEnabled(), this.spawnAnimals);
+        }
+    }
+
+    public boolean isMonsterSpawningEnabled() {
+        return true;
+    }
+
+    public boolean isDemo() {
+        return this.demo;
+    }
+
+    public void setDemo(boolean demo) {
+        this.demo = demo;
+    }
+
+    public void setForceWorldUpgrade(boolean forceWorldUpgrade) {
+        this.forceWorldUpgrade = forceWorldUpgrade;
+    }
+
+    public LevelStorageAccess getSaveStorage() {
+        return this.saveStorage;
+    }
+
+    public String getResourcePackUrl() {
+        return this.resourcePackUrl;
+    }
+
+    public String getResourcePackHash() {
+        return this.resourcePackHash;
+    }
+
+    public void setResourcePack(String url, String hash) {
+        this.resourcePackUrl = url;
+        this.resourcePackHash = hash;
+    }
+
+    public void method_2410(Snooper playerSnooper) {
+        playerSnooper.addInfo("whitelist_enabled", (Object)false);
+        playerSnooper.addInfo("whitelist_count", (Object)0);
+        if (this.playerManager != null) {
+            playerSnooper.addInfo("players_current", (Object)this.getCurrentPlayerCount());
+            playerSnooper.addInfo("players_max", (Object)this.getMaxPlayerCount());
+            playerSnooper.addInfo("players_seen", (Object)this.playerManager.getSavedPlayerIds().length);
+        }
+        playerSnooper.addInfo("uses_auth", (Object)this.onlineMode);
+        playerSnooper.addInfo("gui_state", (Object)(this.hasGui() ? "enabled" : "disabled"));
+        playerSnooper.addInfo("run_time", (Object)((MinecraftServer.getTimeMillis() - playerSnooper.getStartTime()) / 60L * 1000L));
+        playerSnooper.addInfo("avg_tick_ms", (Object)((int)(MathHelper.average((long[])this.lastTickLengths) * 1.0E-6)));
+        int i = 0;
+        if (this.worlds != null) {
+            for (ServerWorld worldserver : this.worlds) {
+                if (worldserver == null) continue;
+                LevelProperties worldinfo = worldserver.method_3588();
+                playerSnooper.addInfo("world[" + i + "][dimension]", (Object)worldserver.field_4558.getDimensionType().getId());
+                playerSnooper.addInfo("world[" + i + "][mode]", (Object)worldinfo.getGamemode());
+                playerSnooper.addInfo("world[" + i + "][difficulty]", (Object)worldserver.method_8519());
+                playerSnooper.addInfo("world[" + i + "][hardcore]", (Object)worldinfo.isHardcore());
+                playerSnooper.addInfo("world[" + i + "][generator_name]", (Object)worldinfo.getGeneratorType().getName());
+                playerSnooper.addInfo("world[" + i + "][generator_version]", (Object)worldinfo.getGeneratorType().getVersion());
+                playerSnooper.addInfo("world[" + i + "][height]", (Object)this.worldHeight);
+                playerSnooper.addInfo("world[" + i + "][chunks_loaded]", (Object)worldserver.getChunkProvider().method_3874());
+                ++i;
+            }
+        }
+        playerSnooper.addInfo("worlds", (Object)i);
+    }
+
+    public void method_2411(Snooper playerSnooper) {
+        playerSnooper.add("singleplayer", (Object)this.isSinglePlayer());
+        playerSnooper.add("server_brand", (Object)this.getServerModName());
+        playerSnooper.add("gui_supported", (Object)(GraphicsEnvironment.isHeadless() ? "headless" : "supported"));
+        playerSnooper.add("dedicated", (Object)this.isDedicated());
+    }
+
+    public boolean method_2409() {
+        return true;
+    }
+
+    public abstract boolean isDedicated();
+
+    public boolean isOnlineMode() {
+        return this.onlineMode;
+    }
+
+    public void setOnlineMode(boolean onlineMode) {
+        this.onlineMode = onlineMode;
+    }
+
+    public boolean shouldSpawnAnimals() {
+        return this.spawnAnimals;
+    }
+
+    public void setSpawnAnimals(boolean spawnAnimals) {
+        this.spawnAnimals = spawnAnimals;
+    }
+
+    public boolean shouldSpawnNpcs() {
+        return this.spawnNpcs;
+    }
+
+    public abstract boolean isUsingNativeTransport();
+
+    public void setSpawnNpcs(boolean spawnNpcs) {
+        this.spawnNpcs = spawnNpcs;
+    }
+
+    public boolean isPvpEnabled() {
+        return this.pvpEnabled;
+    }
+
+    public void setPvpEnabled(boolean pvpEnabled) {
+        this.pvpEnabled = pvpEnabled;
+    }
+
+    public boolean isFlightEnabled() {
+        return this.flightEnabled;
+    }
+
+    public void setFlightEnabled(boolean flightEnabled) {
+        this.flightEnabled = flightEnabled;
+    }
+
+    public abstract boolean areCommandBlocksEnabled();
+
+    public String getServerMotd() {
+        return this.motd;
+    }
+
+    public void setMotd(String motd) {
+        this.motd = motd;
+    }
+
+    public int getWorldHeight() {
+        return this.worldHeight;
+    }
+
+    public void setWorldHeight(int worldHeight) {
+        this.worldHeight = worldHeight;
+    }
+
+    public boolean isStopped() {
+        return this.stopped;
+    }
+
+    public PlayerManager getPlayerManager() {
+        return this.playerManager;
+    }
+
+    public void setPlayerManager(PlayerManager playerManager) {
+        this.playerManager = playerManager;
+    }
+
+    public void method_2999(GameMode gameMode) {
+        for (ServerWorld worldserver : this.worlds) {
+            worldserver.method_3588().method_207(gameMode);
+        }
+    }
+
+    public ServerNetworkIo getNetworkIo() {
+        return this.networkIo;
+    }
+
+    public boolean isLoading() {
+        return this.loading;
+    }
+
+    public boolean hasGui() {
+        return false;
+    }
+
+    public abstract String method_3000(GameMode var1, boolean var2);
+
+    public int getTicks() {
+        return this.ticks;
+    }
+
+    public void enableProfiler() {
+        this.profiling = true;
+    }
+
+    public Snooper getSnooper() {
+        return this.field_13903;
+    }
+
+    public BlockPos method_4086() {
+        return BlockPos.ORIGIN;
+    }
+
+    public Vec3d method_10787() {
+        return Vec3d.ZERO;
+    }
+
+    public World method_5506() {
+        return this.worlds[0];
+    }
+
+    public Entity method_10788() {
+        return null;
+    }
+
+    public boolean isSpawnProtected(World world, BlockPos pos, PlayerEntity player) {
+        return false;
+    }
+
+    public boolean shouldForceGameMode() {
+        return this.forceGameMode;
+    }
+
+    public Proxy getProxy() {
+        return this.proxy;
+    }
+
+    public static long getTimeMillis() {
+        return System.currentTimeMillis();
+    }
+
+    public int getPlayerIdleTimeout() {
+        return this.playerIdleTimeout;
+    }
+
+    public void setPlayerIdleTimeout(int playerIdleTimeout) {
+        this.playerIdleTimeout = playerIdleTimeout;
+    }
+
+    public Text method_6344() {
+        return new LiteralText(this.method_2518());
+    }
+
+    public boolean shouldAnnouncePlayerAchievements() {
+        return true;
+    }
+
+    public MinecraftSessionService getSessionService() {
+        return this.sessionService;
+    }
+
+    public GameProfileRepository getGameProfileRepo() {
+        return this.gameProfileRepo;
+    }
+
+    public UserCache getUserCache() {
+        return this.userCache;
+    }
+
+    public ServerMetadata getServerMetadata() {
+        return this.serverMetadata;
+    }
+
+    public void forcePlayerSampleUpdate() {
+        this.lastPlayerSampleUpdate = 0L;
+    }
+
+    public Entity getEntity(UUID uuid) {
+        for (ServerWorld worldserver : this.worlds) {
+            Entity entity;
+            if (worldserver == null || (entity = worldserver.getEntity(uuid)) == null) continue;
+            return entity;
+        }
+        return null;
+    }
+
+    public boolean method_10789() {
+        return this.worlds[0].method_4679().getBoolean("sendCommandFeedback");
+    }
+
+    public void method_10786(CommandStats.Type type, int amount) {
+    }
+
+    public MinecraftServer method_12833() {
+        return MinecraftServer.getStaticServer();
+    }
+
+    public static MinecraftServer getStaticServer() {
+        return mcServer;
+    }
+
+    public int getMaxWorldBorderRadius() {
+        return 29999984;
+    }
+
+    /*
+     * WARNING - Removed try catching itself - possible behaviour change.
+     */
+    public <V> ListenableFuture<V> method_10815(Callable<V> callable) {
+        Validate.notNull(callable);
+        if (!this.method_6640() && !this.isStopped()) {
+            ListenableFutureTask listenablefuturetask = ListenableFutureTask.create(callable);
+            Queue<FutureTask<?>> queue = this.queue;
+            synchronized (queue) {
+                this.queue.add((Object)listenablefuturetask);
+                return listenablefuturetask;
+            }
+        }
+        try {
+            return Futures.immediateFuture((Object)callable.call());
+        }
+        catch (Exception exception) {
+            return Futures.immediateFailedCheckedFuture((Exception)exception);
+        }
+    }
+
+    public ListenableFuture<Object> method_6635(Runnable runnableToSchedule) {
+        Validate.notNull((Object)runnableToSchedule);
+        return this.method_10815(Executors.callable((Runnable)runnableToSchedule));
+    }
+
+    public boolean method_6640() {
+        return Thread.currentThread() == this.serverThread;
+    }
+
+    public int getNetworkCompressionThreshold() {
+        return 256;
+    }
+
+    public class_2934 method_12836() {
+        return this.field_13904;
+    }
+
+    public int method_12834(ServerWorld worldIn) {
+        return worldIn != null ? worldIn.method_4679().getInt("spawnRadius") : 10;
+    }
+}

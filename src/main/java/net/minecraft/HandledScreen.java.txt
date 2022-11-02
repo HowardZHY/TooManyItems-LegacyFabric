@@ -1,0 +1,504 @@
+package net.minecraft.client.gui.screen.ingame;
+
+import com.google.common.collect.Sets;
+import com.mojang.blaze3d.platform.GLX;
+import com.mojang.blaze3d.platform.GlStateManager;
+import java.io.IOException;
+import java.util.Set;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.render.DiffuseLighting;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.client.texture.SpriteAtlasTexture;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.inventory.slot.Slot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.screen.ScreenHandler;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.ItemAction;
+import net.minecraft.util.math.MathHelper;
+import org.lwjgl.input.Keyboard;
+
+public abstract class HandledScreen
+extends Screen {
+    public static final Identifier INVENTORY_TEXTURE = new Identifier("textures/gui/container/inventory.png");
+    protected int backgroundWidth = 176;
+    protected int backgroundHeight = 166;
+    public ScreenHandler screenHandler;
+    protected int x;
+    protected int y;
+    private Slot focusedSlot;
+    private Slot touchDragSlotStart;
+    private boolean touchIsRightClickDrag;
+    private ItemStack touchDragStack;
+    private int touchDropX;
+    private int touchDropY;
+    private Slot touchDropOriginSlot;
+    private long touchDropTime;
+    private ItemStack touchDropReturningStack;
+    private Slot touchHoveredSlot;
+    private long touchDropTimer;
+    protected final Set<Slot> cursorDragSlots = Sets.newHashSet();
+    protected boolean isCursorDragging;
+    private int heldButtonType;
+    private int heldButtonCode;
+    private boolean cancelNextRelease;
+    private int draggedStackRemainder;
+    private long lastButtonClickTime;
+    private Slot lastClickedSlot;
+    private int lastClickedButton;
+    private boolean isDoubleClicking;
+    private ItemStack quickMovingStack;
+
+    public HandledScreen(ScreenHandler screenHandler) {
+        this.screenHandler = screenHandler;
+        this.cancelNextRelease = true;
+        TMI.instance.controller.onCreate(this);
+    }
+
+    public void method_1035() throws IOException {
+        TMI.instance.controller.onMouseEvent();
+        super.handleMouse();
+    }
+
+    public void method_1044() {
+        super.init();
+        this.field_1229.player.field_3972 = this.screenHandler;
+        this.x = (this.field_1230 - this.backgroundWidth) / 2;
+        this.y = (this.field_1231 - this.backgroundHeight) / 2;
+    }
+
+    public void method_1025(int mouseX, int mouseY, float partialTicks) {
+        ItemStack itemstack;
+        TMI.instance.controller.frameStart(mouseX, mouseY, this.x, this.y, this.backgroundWidth, this.backgroundHeight);
+        this.method_1043();
+        int i = this.x;
+        int j = this.y;
+        this.drawBackground(partialTicks, mouseX, mouseY);
+        GlStateManager.disableRescaleNormal();
+        DiffuseLighting.disable();
+        GlStateManager.disableLighting();
+        GlStateManager.disableDepthTest();
+        super.render(mouseX, mouseY, partialTicks);
+        DiffuseLighting.enable();
+        GlStateManager.pushMatrix();
+        GlStateManager.translatef((float)i, (float)j, (float)0.0f);
+        GlStateManager.color4f((float)1.0f, (float)1.0f, (float)1.0f, (float)1.0f);
+        GlStateManager.enableRescaleNormal();
+        this.focusedSlot = null;
+        int k = 240;
+        int l = 240;
+        GLX.gl13MultiTexCoord2f((int)GLX.lightmapTextureUnit, (float)((float)k / 1.0f), (float)((float)l / 1.0f));
+        GlStateManager.color4f((float)1.0f, (float)1.0f, (float)1.0f, (float)1.0f);
+        for (int i1 = 0; i1 < this.screenHandler.slots.size(); ++i1) {
+            Slot slot = (Slot)this.screenHandler.slots.get(i1);
+            this.drawSlot(slot);
+            if (!this.isPointOverSlot(slot, mouseX, mouseY) || !slot.doDrawHoveringEffect()) continue;
+            this.focusedSlot = slot;
+            GlStateManager.disableLighting();
+            GlStateManager.disableDepthTest();
+            int j1 = slot.xPosition;
+            int k1 = slot.yPosition;
+            GlStateManager.colorMask((boolean)true, (boolean)true, (boolean)true, (boolean)false);
+            this.method_989(j1, k1, j1 + 16, k1 + 16, -2130706433, -2130706433);
+            GlStateManager.colorMask((boolean)true, (boolean)true, (boolean)true, (boolean)true);
+            GlStateManager.enableLighting();
+            GlStateManager.enableDepthTest();
+        }
+        TMI.instance.controller.frameEnd(mouseX, mouseY, this.x, this.y, this.backgroundWidth, this.backgroundHeight);
+        DiffuseLighting.disable();
+        this.drawForeground(mouseX, mouseY);
+        DiffuseLighting.enable();
+        PlayerInventory inventoryplayer = this.field_1229.player.field_3999;
+        ItemStack itemStack = itemstack = this.touchDragStack == null ? inventoryplayer.getCursorStack() : this.touchDragStack;
+        if (itemstack != null) {
+            int j2 = 8;
+            int k2 = this.touchDragStack == null ? 8 : 16;
+            String s = null;
+            if (this.touchDragStack != null && this.touchIsRightClickDrag) {
+                itemstack = itemstack.copy();
+                itemstack.count = MathHelper.ceil((float)((float)itemstack.count / 2.0f));
+            } else if (this.isCursorDragging && this.cursorDragSlots.size() > 1) {
+                itemstack = itemstack.copy();
+                itemstack.count = this.draggedStackRemainder;
+                if (itemstack.count == 0) {
+                    s = "" + Formatting.YELLOW + "0";
+                }
+            }
+            this.drawItem(itemstack, mouseX - i - j2, mouseY - j - k2, s);
+        }
+        if (this.touchDropReturningStack != null) {
+            float f = (float)(MinecraftClient.getTime() - this.touchDropTime) / 100.0f;
+            if (f >= 1.0f) {
+                f = 1.0f;
+                this.touchDropReturningStack = null;
+            }
+            int l2 = this.touchDropOriginSlot.xPosition - this.touchDropX;
+            int i3 = this.touchDropOriginSlot.yPosition - this.touchDropY;
+            int l1 = this.touchDropX + (int)((float)l2 * f);
+            int i2 = this.touchDropY + (int)((float)i3 * f);
+            this.drawItem(this.touchDropReturningStack, l1, i2, null);
+        }
+        GlStateManager.popMatrix();
+        if (inventoryplayer.getCursorStack() == null && this.focusedSlot != null && this.focusedSlot.hasStack()) {
+            ItemStack itemstack1 = this.focusedSlot.getStack();
+            this.method_6752(itemstack1, mouseX, mouseY);
+        }
+        GlStateManager.enableLighting();
+        GlStateManager.enableDepthTest();
+        DiffuseLighting.enableNormally();
+    }
+
+    private void drawItem(ItemStack stack, int xPosition, int yPosition, String amountText) {
+        GlStateManager.translatef((float)0.0f, (float)0.0f, (float)32.0f);
+        this.field_1172 = 200.0f;
+        this.field_7770.zOffset = 200.0f;
+        this.field_7770.method_12461(stack, xPosition, yPosition);
+        this.field_7770.renderGuiItemOverlay(this.field_1234, stack, xPosition, yPosition - (this.touchDragStack == null ? 0 : 8), amountText);
+        this.field_1172 = 0.0f;
+        this.field_7770.zOffset = 0.0f;
+    }
+
+    protected void drawForeground(int mouseX, int mouseY) {
+    }
+
+    protected abstract void drawBackground(float var1, int var2, int var3);
+
+    private void drawSlot(Slot slot) {
+        String s1;
+        int i = slot.xPosition;
+        int j = slot.yPosition;
+        ItemStack itemstack = slot.getStack();
+        boolean flag = false;
+        boolean flag1 = slot == this.touchDragSlotStart && this.touchDragStack != null && !this.touchIsRightClickDrag;
+        ItemStack itemstack1 = this.field_1229.player.field_3999.getCursorStack();
+        String s = null;
+        if (slot == this.touchDragSlotStart && this.touchDragStack != null && this.touchIsRightClickDrag && itemstack != null) {
+            itemstack = itemstack.copy();
+            itemstack.count /= 2;
+        } else if (this.isCursorDragging && this.cursorDragSlots.contains((Object)slot) && itemstack1 != null) {
+            if (this.cursorDragSlots.size() == 1) {
+                return;
+            }
+            if (ScreenHandler.canInsertItemIntoSlot((Slot)slot, (ItemStack)itemstack1, (boolean)true) && this.screenHandler.canInsertIntoSlot(slot)) {
+                itemstack = itemstack1.copy();
+                flag = true;
+                ScreenHandler.calculateStackSize(this.cursorDragSlots, (int)this.heldButtonType, (ItemStack)itemstack, (int)(slot.getStack() == null ? 0 : slot.getStack().count));
+                if (itemstack.count > itemstack.getMaxCount()) {
+                    s = Formatting.YELLOW + "" + itemstack.getMaxCount();
+                    itemstack.count = itemstack.getMaxCount();
+                }
+                if (itemstack.count > slot.getMaxStackAmount(itemstack)) {
+                    s = Formatting.YELLOW + "" + slot.getMaxStackAmount(itemstack);
+                    itemstack.count = slot.getMaxStackAmount(itemstack);
+                }
+            } else {
+                this.cursorDragSlots.remove((Object)slot);
+                this.calculateOffset();
+            }
+        }
+        this.field_1172 = 100.0f;
+        this.field_7770.zOffset = 100.0f;
+        if (itemstack == null && (s1 = slot.getBackgroundSprite()) != null) {
+            Sprite textureatlassprite = this.field_1229.getSpriteAtlasTexture().getSprite(s1);
+            GlStateManager.disableLighting();
+            this.field_1229.getTextureManager().bindTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEX);
+            this.method_9442(i, j, textureatlassprite, 16, 16);
+            GlStateManager.enableLighting();
+            flag1 = true;
+        }
+        if (!flag1) {
+            if (flag) {
+                HandledScreen.method_988((int)i, (int)j, (int)(i + 16), (int)(j + 16), (int)-2130706433);
+            }
+            GlStateManager.enableDepthTest();
+            this.field_7770.method_12461(itemstack, i, j);
+            this.field_7770.renderGuiItemOverlay(this.field_1234, itemstack, i, j, s);
+        }
+        this.field_7770.zOffset = 0.0f;
+        this.field_1172 = 0.0f;
+    }
+
+    private void calculateOffset() {
+        ItemStack itemstack = this.field_1229.player.field_3999.getCursorStack();
+        if (itemstack != null && this.isCursorDragging) {
+            this.draggedStackRemainder = itemstack.count;
+            for (Slot slot : this.cursorDragSlots) {
+                ItemStack itemstack1 = itemstack.copy();
+                int i = slot.getStack() == null ? 0 : slot.getStack().count;
+                ScreenHandler.calculateStackSize(this.cursorDragSlots, (int)this.heldButtonType, (ItemStack)itemstack1, (int)i);
+                if (itemstack1.count > itemstack1.getMaxCount()) {
+                    itemstack1.count = itemstack1.getMaxCount();
+                }
+                if (itemstack1.count > slot.getMaxStackAmount(itemstack1)) {
+                    itemstack1.count = slot.getMaxStackAmount(itemstack1);
+                }
+                this.draggedStackRemainder -= itemstack1.count - i;
+            }
+        }
+    }
+
+    private Slot getSlotAt(int x, int y) {
+        for (int i = 0; i < this.screenHandler.slots.size(); ++i) {
+            Slot slot = (Slot)this.screenHandler.slots.get(i);
+            if (!this.isPointOverSlot(slot, x, y)) continue;
+            return slot;
+        }
+        return null;
+    }
+
+    protected void method_1026(int mouseX, int mouseY, int mouseButton) throws IOException {
+        boolean flag;
+        Slot slot = this.getSlotAt(mouseX, mouseY);
+        boolean bl = flag = mouseButton == this.field_1229.options.keyPickItem.getCode() + 100;
+        if (TMI.instance.controller.onClick(mouseX, mouseY, mouseButton, flag, slot, this.screenHandler)) {
+            super.mouseClicked(mouseX, mouseY, mouseButton);
+            long i = MinecraftClient.getTime();
+            this.isDoubleClicking = this.lastClickedSlot == slot && i - this.lastButtonClickTime < 250L && this.lastClickedButton == mouseButton;
+            this.cancelNextRelease = false;
+            if (mouseButton == 0 || mouseButton == 1 || flag) {
+                int j = this.x;
+                int k = this.y;
+                boolean flag1 = mouseX < j || mouseY < k || mouseX >= j + this.backgroundWidth || mouseY >= k + this.backgroundHeight;
+                int l = -1;
+                if (slot != null) {
+                    l = slot.id;
+                }
+                if (flag1) {
+                    l = -999;
+                }
+                if (this.field_1229.options.touchScreen && flag1 && this.field_1229.player.field_3999.getCursorStack() == null) {
+                    this.field_1229.openScreen((Screen)null);
+                    return;
+                }
+                if (l != -1) {
+                    if (this.field_1229.options.touchScreen) {
+                        if (slot != null && slot.hasStack()) {
+                            this.touchDragSlotStart = slot;
+                            this.touchDragStack = null;
+                            this.touchIsRightClickDrag = mouseButton == 1;
+                        } else {
+                            this.touchDragSlotStart = null;
+                        }
+                    } else if (!this.isCursorDragging) {
+                        if (this.field_1229.player.field_3999.getCursorStack() == null) {
+                            if (mouseButton == this.field_1229.options.keyPickItem.getCode() + 100) {
+                                this.method_1131(slot, l, mouseButton, ItemAction.CLONE);
+                            } else {
+                                boolean flag2 = l != -999 && (Keyboard.isKeyDown((int)42) || Keyboard.isKeyDown((int)54));
+                                ItemAction clicktype = ItemAction.PICKUP;
+                                if (flag2) {
+                                    this.quickMovingStack = slot != null && slot.hasStack() ? slot.getStack() : null;
+                                    clicktype = ItemAction.QUICK_MOVE;
+                                } else if (l == -999) {
+                                    clicktype = ItemAction.THROW;
+                                }
+                                this.method_1131(slot, l, mouseButton, clicktype);
+                            }
+                            this.cancelNextRelease = true;
+                        } else {
+                            this.isCursorDragging = true;
+                            this.heldButtonCode = mouseButton;
+                            this.cursorDragSlots.clear();
+                            if (mouseButton == 0) {
+                                this.heldButtonType = 0;
+                            } else if (mouseButton == 1) {
+                                this.heldButtonType = 1;
+                            } else if (mouseButton == this.field_1229.options.keyPickItem.getCode() + 100) {
+                                this.heldButtonType = 2;
+                            }
+                        }
+                    }
+                }
+            }
+            this.lastClickedSlot = slot;
+            this.lastButtonClickTime = i;
+            this.lastClickedButton = mouseButton;
+        }
+    }
+
+    protected void method_4259(int mouseX, int mouseY, int clickedMouseButton, long timeSinceLastClick) {
+        Slot slot = this.getSlotAt(mouseX, mouseY);
+        ItemStack itemstack = this.field_1229.player.field_3999.getCursorStack();
+        if (this.touchDragSlotStart != null && this.field_1229.options.touchScreen) {
+            if (clickedMouseButton == 0 || clickedMouseButton == 1) {
+                if (this.touchDragStack == null) {
+                    if (slot != this.touchDragSlotStart && this.touchDragSlotStart.getStack() != null) {
+                        this.touchDragStack = this.touchDragSlotStart.getStack().copy();
+                    }
+                } else if (this.touchDragStack.count > 1 && slot != null && ScreenHandler.canInsertItemIntoSlot((Slot)slot, (ItemStack)this.touchDragStack, (boolean)false)) {
+                    long i = MinecraftClient.getTime();
+                    if (this.touchHoveredSlot == slot) {
+                        if (i - this.touchDropTimer > 500L) {
+                            this.method_1131(this.touchDragSlotStart, this.touchDragSlotStart.id, 0, ItemAction.PICKUP);
+                            this.method_1131(slot, slot.id, 1, ItemAction.PICKUP);
+                            this.method_1131(this.touchDragSlotStart, this.touchDragSlotStart.id, 0, ItemAction.PICKUP);
+                            this.touchDropTimer = i + 750L;
+                            --this.touchDragStack.count;
+                        }
+                    } else {
+                        this.touchHoveredSlot = slot;
+                        this.touchDropTimer = i;
+                    }
+                }
+            }
+        } else if (this.isCursorDragging && slot != null && itemstack != null && itemstack.count > this.cursorDragSlots.size() && ScreenHandler.canInsertItemIntoSlot((Slot)slot, (ItemStack)itemstack, (boolean)true) && slot.canInsert(itemstack) && this.screenHandler.canInsertIntoSlot(slot)) {
+            this.cursorDragSlots.add((Object)slot);
+            this.calculateOffset();
+        }
+    }
+
+    protected void method_1032(int mouseX, int mouseY, int state) {
+        Slot slot = this.getSlotAt(mouseX, mouseY);
+        int i = this.x;
+        int j = this.y;
+        boolean flag = mouseX < i || mouseY < j || mouseX >= i + this.backgroundWidth || mouseY >= j + this.backgroundHeight;
+        int k = -1;
+        if (slot != null) {
+            k = slot.id;
+        }
+        if (flag) {
+            k = -999;
+        }
+        if (this.isDoubleClicking && slot != null && state == 0 && this.screenHandler.canInsertIntoSlot((ItemStack)null, slot)) {
+            if (HandledScreen.method_1042()) {
+                if (slot != null && slot.inventory != null && this.quickMovingStack != null) {
+                    for (Slot slot2 : this.screenHandler.slots) {
+                        if (slot2 == null || !slot2.canTakeItems((PlayerEntity)this.field_1229.player) || !slot2.hasStack() || slot2.inventory != slot.inventory || !ScreenHandler.canInsertItemIntoSlot((Slot)slot2, (ItemStack)this.quickMovingStack, (boolean)true)) continue;
+                        this.method_1131(slot2, slot2.id, state, ItemAction.QUICK_MOVE);
+                    }
+                }
+            } else {
+                this.method_1131(slot, k, state, ItemAction.PICKUP_ALL);
+            }
+            this.isDoubleClicking = false;
+            this.lastButtonClickTime = 0L;
+        } else {
+            if (this.isCursorDragging && this.heldButtonCode != state) {
+                this.isCursorDragging = false;
+                this.cursorDragSlots.clear();
+                this.cancelNextRelease = true;
+                return;
+            }
+            if (this.cancelNextRelease) {
+                this.cancelNextRelease = false;
+                return;
+            }
+            if (this.touchDragSlotStart != null && this.field_1229.options.touchScreen) {
+                if (state == 0 || state == 1) {
+                    if (this.touchDragStack == null && slot != this.touchDragSlotStart) {
+                        this.touchDragStack = this.touchDragSlotStart.getStack();
+                    }
+                    boolean flag2 = ScreenHandler.canInsertItemIntoSlot((Slot)slot, (ItemStack)this.touchDragStack, (boolean)false);
+                    if (k != -1 && this.touchDragStack != null && flag2) {
+                        this.method_1131(this.touchDragSlotStart, this.touchDragSlotStart.id, state, ItemAction.PICKUP);
+                        this.method_1131(slot, k, 0, ItemAction.PICKUP);
+                        if (this.field_1229.player.field_3999.getCursorStack() != null) {
+                            this.method_1131(this.touchDragSlotStart, this.touchDragSlotStart.id, state, ItemAction.PICKUP);
+                            this.touchDropX = mouseX - i;
+                            this.touchDropY = mouseY - j;
+                            this.touchDropOriginSlot = this.touchDragSlotStart;
+                            this.touchDropReturningStack = this.touchDragStack;
+                            this.touchDropTime = MinecraftClient.getTime();
+                        } else {
+                            this.touchDropReturningStack = null;
+                        }
+                    } else if (this.touchDragStack != null) {
+                        this.touchDropX = mouseX - i;
+                        this.touchDropY = mouseY - j;
+                        this.touchDropOriginSlot = this.touchDragSlotStart;
+                        this.touchDropReturningStack = this.touchDragStack;
+                        this.touchDropTime = MinecraftClient.getTime();
+                    }
+                    this.touchDragStack = null;
+                    this.touchDragSlotStart = null;
+                }
+            } else if (this.isCursorDragging && !this.cursorDragSlots.isEmpty()) {
+                this.method_1131(null, -999, ScreenHandler.packClickData((int)0, (int)this.heldButtonType), ItemAction.QUICK_CRAFT);
+                for (Slot slot1 : this.cursorDragSlots) {
+                    this.method_1131(slot1, slot1.id, ScreenHandler.packClickData((int)1, (int)this.heldButtonType), ItemAction.QUICK_CRAFT);
+                }
+                this.method_1131(null, -999, ScreenHandler.packClickData((int)2, (int)this.heldButtonType), ItemAction.QUICK_CRAFT);
+            } else if (this.field_1229.player.field_3999.getCursorStack() != null) {
+                if (state == this.field_1229.options.keyPickItem.getCode() + 100) {
+                    this.method_1131(slot, k, state, ItemAction.CLONE);
+                } else {
+                    boolean flag1;
+                    boolean bl = flag1 = k != -999 && (Keyboard.isKeyDown((int)42) || Keyboard.isKeyDown((int)54));
+                    if (flag1) {
+                        this.quickMovingStack = slot != null && slot.hasStack() ? slot.getStack() : null;
+                    }
+                    this.method_1131(slot, k, state, flag1 ? ItemAction.QUICK_MOVE : ItemAction.PICKUP);
+                }
+            }
+        }
+        if (this.field_1229.player.field_3999.getCursorStack() == null) {
+            this.lastButtonClickTime = 0L;
+        }
+        this.isCursorDragging = false;
+    }
+
+    private boolean isPointOverSlot(Slot slot, int pointX, int pointY) {
+        return this.isPointWithinBounds(slot.xPosition, slot.yPosition, 16, 16, pointX, pointY);
+    }
+
+    protected boolean isPointWithinBounds(int posX, int posY, int width, int height, int pointX, int pointY) {
+        int i = this.x;
+        int j = this.y;
+        return (pointX -= i) >= posX - 1 && pointX < posX + width + 1 && (pointY -= j) >= posY - 1 && pointY < posY + height + 1;
+    }
+
+    protected void method_1131(Slot slotIn, int slotId, int mouseButton, ItemAction type) {
+        if (slotIn != null) {
+            slotId = slotIn.id;
+        }
+        this.field_1229.interactionManager.method_1224(this.screenHandler.syncId, slotId, mouseButton, type, (PlayerEntity)this.field_1229.player);
+    }
+
+    protected void method_1024(char typedChar, int keyCode) throws IOException {
+        if (TMI.instance.controller.onKeypress(typedChar, keyCode)) {
+            if (keyCode == 1 || keyCode == this.field_1229.options.keyInventory.getCode()) {
+                this.field_1229.player.method_3208();
+            }
+            this.handleHotbarKeyPressed(keyCode);
+            if (this.focusedSlot != null && this.focusedSlot.hasStack()) {
+                if (keyCode == this.field_1229.options.keyPickItem.getCode()) {
+                    this.method_1131(this.focusedSlot, this.focusedSlot.id, 0, ItemAction.CLONE);
+                } else if (keyCode == this.field_1229.options.keyDrop.getCode()) {
+                    this.method_1131(this.focusedSlot, this.focusedSlot.id, HandledScreen.method_1041() ? 1 : 0, ItemAction.THROW);
+                }
+            }
+        }
+    }
+
+    protected boolean handleHotbarKeyPressed(int keyCode) {
+        if (this.field_1229.player.field_3999.getCursorStack() == null && this.focusedSlot != null) {
+            for (int i = 0; i < 9; ++i) {
+                if (keyCode != this.field_1229.options.keysHotbar[i].getCode()) continue;
+                this.method_1131(this.focusedSlot, this.focusedSlot.id, i, ItemAction.SWAP);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void method_1030() {
+        TMI.instance.controller.onClose();
+        if (this.field_1229.player != null) {
+            this.screenHandler.close((PlayerEntity)this.field_1229.player);
+        }
+    }
+
+    public boolean method_1037() {
+        return TMI.instance.controller.shouldPauseGame();
+    }
+
+    public void method_1033() {
+        super.tick();
+        if (!this.field_1229.player.method_2476() || this.field_1229.player.field_3204) {
+            this.field_1229.player.method_3208();
+        }
+    }
+}

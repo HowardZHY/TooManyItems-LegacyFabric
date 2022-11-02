@@ -1,0 +1,15 @@
+package net.minecraft.src.mixin;
+
+import net.minecraft.command.CommandSource;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.ThreadExecutor;
+import net.minecraft.util.snooper.Snoopable;
+import org.spongepowered.asm.mixin.Mixin;
+
+@Mixin(MinecraftServer.class)
+public abstract class MinecraftServerMixin implements Runnable, CommandSource, ThreadExecutor, Snoopable {
+    private static MinecraftServer mcServer;
+    public static MinecraftServer getStaticServer() {
+        return mcServer;
+    }
+}

@@ -1,0 +1,27 @@
+/*
+ * Decompiled with CFR 0.1.0 (FabricMC a830a72d).
+ * 
+ * Could not load the following classes:
+ *  java.lang.Object
+ *  java.lang.Override
+ *  net.minecraft.entity.attribute.AttributeModifier
+ */
+package net.minecraft.entity.effect;
+
+import net.minecraft.entity.attribute.AttributeModifier;
+import net.minecraft.entity.effect.StatusEffect;
+
+public class CombatStatusEffect
+extends StatusEffect {
+    protected final double field_14447;
+
+    protected CombatStatusEffect(boolean isBadEffectIn, int liquidColorIn, double bonusPerLevelIn, int id) {
+        super(isBadEffectIn, liquidColorIn, id);
+        this.field_14447 = bonusPerLevelIn;
+    }
+
+    @Override
+    public double adjustModifierAmount(int amplifier, AttributeModifier modifier) {
+        return this.field_14447 * (double)(amplifier + 1);
+    }
+}

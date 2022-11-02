@@ -1,0 +1,492 @@
+package net.minecraft.client.gui.widget;
+
+import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
+import com.mojang.blaze3d.platform.GlStateManager;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawableHelper;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.PagedEntryListWidget;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.render.Tessellator;
+import net.minecraft.client.render.VertexFormats;
+import net.minecraft.util.SharedConstants;
+import net.minecraft.util.math.MathHelper;
+
+public class TextFieldWidget
+extends DrawableHelper {
+    private final int id;
+    private final TextRenderer textRenderer;
+    public int x;
+    public int y;
+    private final int width;
+    private final int height;
+    private String text = "";
+    private int maxLength = 32;
+    private int focusedTicks;
+    private boolean hasBorder = true;
+    private boolean focusUnlocked = true;
+    private boolean focused;
+    private boolean editable = true;
+    private int firstCharacterIndex;
+    private int selectionStart;
+    private int selectionEnd;
+    private int editableColor = 0xE0E0E0;
+    private int uneditableColor = 0x707070;
+    private boolean visible = true;
+    private PagedEntryListWidget.Listener updateListener;
+    private Predicate<String> textPredicate = Predicates.alwaysTrue();
+
+    public TextFieldWidget(int id, TextRenderer textRenderer, int x, int y, int width, int height) {
+        this.id = id;
+        this.textRenderer = textRenderer;
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+    }
+
+    public void setListener(PagedEntryListWidget.Listener listener) {
+        this.updateListener = listener;
+    }
+
+    public void tick() {
+        ++this.focusedTicks;
+    }
+
+    public void setText(String text) {
+        if (this.textPredicate.apply((Object)text)) {
+            this.text = text.length() > this.maxLength ? text.substring(0, this.maxLength) : text;
+            this.setCursorToEnd();
+        }
+    }
+
+    public String getText() {
+        return this.text;
+    }
+
+    public String getSelectedText() {
+        int i = this.selectionStart < this.selectionEnd ? this.selectionStart : this.selectionEnd;
+        int j = this.selectionStart < this.selectionEnd ? this.selectionEnd : this.selectionStart;
+        return this.text.substring(i, j);
+    }
+
+    public void setTextPredicate(Predicate<String> theValidator) {
+        this.textPredicate = theValidator;
+    }
+
+    public void write(String text) {
+        int l;
+        String s = "";
+        String s1 = SharedConstants.stripInvalidChars((String)text);
+        int i = this.selectionStart < this.selectionEnd ? this.selectionStart : this.selectionEnd;
+        int j = this.selectionStart < this.selectionEnd ? this.selectionEnd : this.selectionStart;
+        int k = this.maxLength - this.text.length() - (i - j);
+        if (!this.text.isEmpty()) {
+            s = s + this.text.substring(0, i);
+        }
+        if (k < s1.length()) {
+            s = s + s1.substring(0, k);
+            l = k;
+        } else {
+            s = s + s1;
+            l = s1.length();
+        }
+        if (!this.text.isEmpty() && j < this.text.length()) {
+            s = s + this.text.substring(j);
+        }
+        if (this.textPredicate.apply((Object)s)) {
+            this.text = s;
+            this.moveCursor(i - this.selectionEnd + l);
+            if (this.updateListener != null) {
+                this.updateListener.setStringValue(this.id, this.text);
+            }
+        }
+    }
+
+    public void eraseWords(int wordOffset) {
+        if (!this.text.isEmpty()) {
+            if (this.selectionEnd != this.selectionStart) {
+                this.write("");
+            } else {
+                this.eraseCharacters(this.getWordSkipPosition(wordOffset) - this.selectionStart);
+            }
+        }
+    }
+
+    public void eraseCharacters(int characterOffset) {
+        if (!this.text.isEmpty()) {
+            if (this.selectionEnd != this.selectionStart) {
+                this.write("");
+            } else {
+                boolean flag = characterOffset < 0;
+                int i = flag ? this.selectionStart + characterOffset : this.selectionStart;
+                int j = flag ? this.selectionStart : this.selectionStart + characterOffset;
+                String s = "";
+                if (i >= 0) {
+                    s = this.text.substring(0, i);
+                }
+                if (j < this.text.length()) {
+                    s = s + this.text.substring(j);
+                }
+                if (this.textPredicate.apply((Object)s)) {
+                    this.text = s;
+                    if (flag) {
+                        this.moveCursor(characterOffset);
+                    }
+                    if (this.updateListener != null) {
+                        this.updateListener.setStringValue(this.id, this.text);
+                    }
+                }
+            }
+        }
+    }
+
+    public int getId() {
+        return this.id;
+    }
+
+    public int getWordSkipPosition(int wordOffset) {
+        return this.getWordSkipPosition(wordOffset, this.getCursor());
+    }
+
+    public int getWordSkipPosition(int wordOffset, int cursorPosition) {
+        return this.getWordSkipPosition(wordOffset, cursorPosition, true);
+    }
+
+    public int getWordSkipPosition(int wordOffset, int cursorPosition, boolean skipOverSpaces) {
+        int i = cursorPosition;
+        boolean flag = wordOffset < 0;
+        int j = Math.abs((int)wordOffset);
+        for (int k = 0; k < j; ++k) {
+            if (!flag) {
+                int l = this.text.length();
+                if ((i = this.text.indexOf(32, i)) == -1) {
+                    i = l;
+                    continue;
+                }
+                while (skipOverSpaces && i < l && this.text.charAt(i) == ' ') {
+                    ++i;
+                }
+                continue;
+            }
+            while (skipOverSpaces && i > 0 && this.text.charAt(i - 1) == ' ') {
+                --i;
+            }
+            while (i > 0 && this.text.charAt(i - 1) != ' ') {
+                --i;
+            }
+        }
+        return i;
+    }
+
+    public void moveCursor(int offset) {
+        this.setCursor(this.selectionEnd + offset);
+    }
+
+    public void setCursor(int cursor) {
+        this.selectionStart = cursor;
+        int i = this.text.length();
+        this.selectionStart = MathHelper.clamp((int)this.selectionStart, (int)0, (int)i);
+        this.setSelectionEnd(this.selectionStart);
+    }
+
+    public void setCursorToStart() {
+        this.setCursor(0);
+    }
+
+    public void setCursorToEnd() {
+        this.setCursor(this.text.length());
+    }
+
+    public boolean keyPressed(char character, int code) {
+        if (!this.focused) {
+            return false;
+        }
+        if (Screen.isSelectAll((int)code)) {
+            this.setCursorToEnd();
+            this.setSelectionEnd(0);
+            return true;
+        }
+        if (Screen.isCopy((int)code)) {
+            Screen.setClipboard((String)this.getSelectedText());
+            return true;
+        }
+        if (Screen.isPaste((int)code)) {
+            if (this.editable) {
+                this.write(Screen.getClipboard());
+            }
+            return true;
+        }
+        if (Screen.isCut((int)code)) {
+            Screen.setClipboard((String)this.getSelectedText());
+            if (this.editable) {
+                this.write("");
+            }
+            return true;
+        }
+        switch (code) {
+            case 14: {
+                if (Screen.hasControlDown()) {
+                    if (this.editable) {
+                        this.eraseWords(-1);
+                    }
+                } else if (this.editable) {
+                    this.eraseCharacters(-1);
+                }
+                return true;
+            }
+            case 199: {
+                if (Screen.hasShiftDown()) {
+                    this.setSelectionEnd(0);
+                } else {
+                    this.setCursorToStart();
+                }
+                return true;
+            }
+            case 203: {
+                if (Screen.hasShiftDown()) {
+                    if (Screen.hasControlDown()) {
+                        this.setSelectionEnd(this.getWordSkipPosition(-1, this.getSelectionEnd()));
+                    } else {
+                        this.setSelectionEnd(this.getSelectionEnd() - 1);
+                    }
+                } else if (Screen.hasControlDown()) {
+                    this.setCursor(this.getWordSkipPosition(-1));
+                } else {
+                    this.moveCursor(-1);
+                }
+                return true;
+            }
+            case 205: {
+                if (Screen.hasShiftDown()) {
+                    if (Screen.hasControlDown()) {
+                        this.setSelectionEnd(this.getWordSkipPosition(1, this.getSelectionEnd()));
+                    } else {
+                        this.setSelectionEnd(this.getSelectionEnd() + 1);
+                    }
+                } else if (Screen.hasControlDown()) {
+                    this.setCursor(this.getWordSkipPosition(1));
+                } else {
+                    this.moveCursor(1);
+                }
+                return true;
+            }
+            case 207: {
+                if (Screen.hasShiftDown()) {
+                    this.setSelectionEnd(this.text.length());
+                } else {
+                    this.setCursorToEnd();
+                }
+                return true;
+            }
+            case 211: {
+                if (Screen.hasControlDown()) {
+                    if (this.editable) {
+                        this.eraseWords(1);
+                    }
+                } else if (this.editable) {
+                    this.eraseCharacters(1);
+                }
+                return true;
+            }
+        }
+        if (SharedConstants.isValidChar((char)character)) {
+            if (this.editable) {
+                this.write(Character.toString((char)character));
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public void mouseClicked(int mouseX, int mouseY, int button) {
+        boolean flag;
+        boolean bl = flag = mouseX >= this.x && mouseX < this.x + this.width && mouseY >= this.y && mouseY < this.y + this.height;
+        if (this.focusUnlocked) {
+            this.setFocused(flag);
+        }
+        if (this.focused && flag && button == 0) {
+            int i = mouseX - this.x;
+            if (this.hasBorder) {
+                i -= 4;
+            }
+            String s = this.textRenderer.trimToWidth(this.text.substring(this.firstCharacterIndex), this.getInnerWidth());
+            this.setCursor(this.textRenderer.trimToWidth(s, i).length() + this.firstCharacterIndex);
+        }
+    }
+
+    public void render() {
+        if (this.isVisible()) {
+            if (this.hasBorder()) {
+                TextFieldWidget.method_988((int)(this.x - 1), (int)(this.y - 1), (int)(this.x + this.width + 1), (int)(this.y + this.height + 1), (int)-6250336);
+                TextFieldWidget.method_988((int)this.x, (int)this.y, (int)(this.x + this.width), (int)(this.y + this.height), (int)-16777216);
+            }
+            int i = this.editable ? this.editableColor : this.uneditableColor;
+            int j = this.selectionStart - this.firstCharacterIndex;
+            int k = this.selectionEnd - this.firstCharacterIndex;
+            String s = this.textRenderer.trimToWidth(this.text.substring(this.firstCharacterIndex), this.getInnerWidth());
+            boolean flag = j >= 0 && j <= s.length();
+            boolean flag1 = this.focused && this.focusedTicks / 6 % 2 == 0 && flag;
+            int l = this.hasBorder ? this.x + 4 : this.x;
+            int i1 = this.hasBorder ? this.y + (this.height - 8) / 2 : this.y;
+            int j1 = l;
+            if (k > s.length()) {
+                k = s.length();
+            }
+            if (!s.isEmpty()) {
+                String s1 = flag ? s.substring(0, j) : s;
+                j1 = this.textRenderer.drawWithShadow(s1, (float)l, (float)i1, i);
+            }
+            boolean flag2 = this.selectionStart < this.text.length() || this.text.length() >= this.getMaxLength();
+            int k1 = j1;
+            if (!flag) {
+                k1 = j > 0 ? l + this.width : l;
+            } else if (flag2) {
+                k1 = j1 - 1;
+                --j1;
+            }
+            if (!s.isEmpty() && flag && j < s.length()) {
+                j1 = this.textRenderer.drawWithShadow(s.substring(j), (float)j1, (float)i1, i);
+            }
+            if (flag1) {
+                if (flag2) {
+                    DrawableHelper.fill((int)k1, (int)(i1 - 1), (int)(k1 + 1), (int)(i1 + 1 + this.textRenderer.fontHeight), (int)-3092272);
+                } else {
+                    this.textRenderer.drawWithShadow("_", (float)k1, (float)i1, i);
+                }
+            }
+            if (k != j) {
+                int l1 = l + this.textRenderer.getStringWidth(s.substring(0, k));
+                this.renderSelection(k1, i1 - 1, l1 - 1, i1 + 1 + this.textRenderer.fontHeight);
+            }
+        }
+    }
+
+    private void renderSelection(int x1, int y1, int x2, int y2) {
+        if (x1 < x2) {
+            int i = x1;
+            x1 = x2;
+            x2 = i;
+        }
+        if (y1 < y2) {
+            int j = y1;
+            y1 = y2;
+            y2 = j;
+        }
+        if (x2 > this.x + this.width) {
+            x2 = this.x + this.width;
+        }
+        if (x1 > this.x + this.width) {
+            x1 = this.x + this.width;
+        }
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder vertexbuffer = tessellator.getBuffer();
+        GlStateManager.color4f((float)0.0f, (float)0.0f, (float)255.0f, (float)255.0f);
+        GlStateManager.disableTexture();
+        GlStateManager.enableColorLogic();
+        GlStateManager.method_9807((GlStateManager.class_2868)GlStateManager.class_2868.field_13505);
+        vertexbuffer.begin(7, VertexFormats.POSITION);
+        vertexbuffer.vertex((double)x1, (double)y2, 0.0).next();
+        vertexbuffer.vertex((double)x2, (double)y2, 0.0).next();
+        vertexbuffer.vertex((double)x2, (double)y1, 0.0).next();
+        vertexbuffer.vertex((double)x1, (double)y1, 0.0).next();
+        tessellator.draw();
+        GlStateManager.disableColorLogic();
+        GlStateManager.enableTexture();
+    }
+
+    public void setMaxLength(int maximumLength) {
+        this.maxLength = maximumLength;
+        if (this.text.length() > maximumLength) {
+            this.text = this.text.substring(0, maximumLength);
+        }
+    }
+
+    public int getMaxLength() {
+        return this.maxLength;
+    }
+
+    public int getCursor() {
+        return this.selectionStart;
+    }
+
+    public boolean hasBorder() {
+        return this.hasBorder;
+    }
+
+    public void setHasBorder(boolean hasBorder) {
+        this.hasBorder = hasBorder;
+    }
+
+    public void setEditableColor(int color) {
+        this.editableColor = color;
+    }
+
+    public void setUneditableColor(int color) {
+        this.uneditableColor = color;
+    }
+
+    public void setFocused(boolean focused) {
+        if (focused && !this.focused) {
+            this.focusedTicks = 0;
+        }
+        this.focused = focused;
+    }
+
+    public boolean isFocused() {
+        return this.focused;
+    }
+
+    public void setEditable(boolean editable) {
+        this.editable = editable;
+    }
+
+    public int getSelectionEnd() {
+        return this.selectionEnd;
+    }
+
+    public int getInnerWidth() {
+        return this.hasBorder() ? this.width - 8 : this.width;
+    }
+
+    public void setSelectionEnd(int position) {
+        int i = this.text.length();
+        if (position > i) {
+            position = i;
+        }
+        if (position < 0) {
+            position = 0;
+        }
+        this.selectionEnd = position;
+        if (this.textRenderer != null) {
+            if (this.firstCharacterIndex > i) {
+                this.firstCharacterIndex = i;
+            }
+            int j = this.getInnerWidth();
+            String s = this.textRenderer.trimToWidth(this.text.substring(this.firstCharacterIndex), j);
+            int k = s.length() + this.firstCharacterIndex;
+            if (position == this.firstCharacterIndex) {
+                this.firstCharacterIndex -= this.textRenderer.trimToWidth(this.text, j, true).length();
+            }
+            if (position > k) {
+                this.firstCharacterIndex += position - k;
+            } else if (position <= this.firstCharacterIndex) {
+                this.firstCharacterIndex -= this.firstCharacterIndex - position;
+            }
+            this.firstCharacterIndex = MathHelper.clamp((int)this.firstCharacterIndex, (int)0, (int)i);
+        }
+    }
+
+    public void setFocusUnlocked(boolean focusUnlocked) {
+        this.focusUnlocked = focusUnlocked;
+    }
+
+    public boolean isVisible() {
+        return this.visible;
+    }
+
+    public void setVisible(boolean visible) {
+        this.visible = visible;
+    }
+}
