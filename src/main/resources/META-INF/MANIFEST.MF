@@ -1,0 +1,3 @@
+Manifest-Version: 1.0
+FMLCorePlugin: TMIForgeLoader
+FMLAT: TMI_at.cfg

@@ -1,0 +1,7 @@
+accessWidener v1 named
+
+accessible method net/minecraft/nbt/NbtList read (Ljava/io/DataInput;ILnet/minecraft/nbt/PositionTracker;)V
+
+accessible method net/minecraft/nbt/NbtList write (Ljava/io/DataOutput;)V
+
+accessible method net/minecraft/client/texture/TextureUtil bindTexture (I)V
