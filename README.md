@@ -16,7 +16,7 @@ see https://github.com/HowardZHY/TooManyItems for 1.8.8/9 Forge one and more inf
 4. Put TMILegacyFabricLoader.jar in mods folder
 5. Launch and Enjoy
 
-(For 1.8.2-1.8.9/15w14a and 1.10.2 test build)
+(For latest 1.8.2-1.8.9/15w14a and 1.10.2 test build)
 
 2. Put the mod jar in mods folder and just launch Legacy Fabric.
 
