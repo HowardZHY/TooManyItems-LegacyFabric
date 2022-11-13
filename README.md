@@ -15,6 +15,7 @@ see https://github.com/HowardZHY/TooManyItems for 1.8.8/9 Forge one and more inf
 3. Drag the files in the zip into .fabric\remappedJars\minecraft-1.8.9-0.14.9(or other version)\client-intermediary.jar
 4. Put TMILegacyFabricLoader.jar in mods folder
 5. Launch and Enjoy
+
 (For 1.8.2-1.8.9/15w14a and 1.10.2 test build)
 2. Put the mod jar in mods folder and just launch Legacy Fabric.
 
