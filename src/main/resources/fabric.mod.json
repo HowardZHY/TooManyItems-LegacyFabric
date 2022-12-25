@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "tmi",
+  "version": "1.5.2-Mixin",
+  "name": "TMI",
+  "description": "Too Many Items For LegacyFabric using Mixin; Create items, save states, cheats, etc.",
+  "authors": [
+    "Marglyph",
+    "Wotblitz",
+    "HowardZHY",
+    "Arminias"
+  ],
+  "contact": {
+    "sources": "https://github.com/HowardZHY/TooManyItems-LegacyFabric"
+  },
+  "license": "ARR+CUSTOM",
+  "environment": "client",
+  "entrypoints": {
+    "main": [
+      "net.minecraft.src.TMIFabricContainer"
+    ]
+  },
+  "mixins": [
+    "TMI.mixins.json"
+  ],
+  "accessWidener": "TMI.accesswidener",
+  "depends": {
+  },
+  "custom": {
+    "modmenu:clientsideOnly": true
+  }
+}
