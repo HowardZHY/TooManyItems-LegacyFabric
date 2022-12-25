@@ -6,10 +6,8 @@ see https://github.com/HowardZHY/TooManyItems for more info
 
 ## Install:
 1. Install Fabric Loader
-2. Launch Legacy Fabric, there'll be a .fabric folder, then exit the game
-3. Drag the files in the zip into .fabric\remappedJars\minecraft-1.5.2-0.14.9(or other version)\client-intermediary.jar
-4. Put TMILegacyFabricLoader.jar in mods folder
-5. Launch and Enjoy
+2. Just put TMILegacyFabric-1.5.2-Mixin in mods folder
+3. Launch and Enjoy
 
 Known Bugs: none
 ![image](https://github.com/HowardZHY/TooManyItems-LegacyFabric/blob/1.5.2/TMI1.5.2.png)
