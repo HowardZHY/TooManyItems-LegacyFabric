@@ -6,7 +6,7 @@ see https://github.com/HowardZHY/TooManyItems for more info
 
 ## Install:
 1. Install Fabric Loader
-2. Just put TMILegacyFabric-1.5.2-Mixin in mods folder
+2. Just put TMILegacyFabric-1.5.2-Mixin.jar in mods folder
 3. Launch and Enjoy
 
 Known Bugs: none
