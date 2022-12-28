@@ -1,0 +1,10 @@
+accessWidener	v1	named
+accessible	class	net/minecraft/client/class_417
+accessible	field	net/minecraft/world/World   levelProperties Lnet/minecraft/world/level/LevelProperties;
+accessible	field	net/minecraft/client/gui/screen/Screen  field_1234    Lnet/minecraft/client/font/TextRenderer;
+accessible	field   net/minecraft/entity/player/PlayerEntity    field_3973  Lnet/minecraft/entity/player/HungerManager;
+accessible	field	net/minecraft/class_988	field_3982	Ljava/lang/String;
+accessible	method	net/minecraft/client/gui/DrawableHelper	fillGradient	(IIIIII)V
+accessible	method	net/minecraft/client/gui/screen/ingame/HandledScreen    method_1131 (Lnet/minecraft/inventory/slot/Slot;IIZ)V
+accessible	method	net/minecraft/nbt/NbtList	method_1649	(Ljava/io/DataInput;)V
+accessible	method	net/minecraft/nbt/NbtList	method_1650	(Ljava/io/DataOutput;)V
