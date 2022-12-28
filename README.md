@@ -1,15 +1,13 @@
 # TooManyItems-LegayFabric
 
-TooManyItems mod For Legacy Fabric 1.6.1-1.6.4
+TooManyItems mod For Legacy Fabric 1.6.0-1.6.4
 
 see https://github.com/HowardZHY/TooManyItems for more info
 
 ## Install:
 1. Install Fabric Loader
-2. Launch Legacy Fabric, there'll be a .fabric folder, then exit the game
-3. Drag the files in the zip into .fabric\remappedJars\minecraft-1.6.4-0.14.9(or other version)\client-intermediary.jar
-4. Put TMILegacyFabricLoader.jar in mods folder
-5. Launch and Enjoy
+2. Just put TMILegacyFabric-1.6.4-Mixin.jar in mods folder
+3. Launch and Enjoy
 
 Known Bugs: none
 ![image](https://github.com/HowardZHY/TooManyItems-LegacyFabric/blob/1.6.4/TMI1.6.4.png)
